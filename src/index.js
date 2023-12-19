@@ -1,53 +1,65 @@
 import http from "http";
 import connectDb from "./db/index.js";
 import { config } from "dotenv";
-import { createTodo } from "./controllers/todos.js";
-
+import {
+  createTodo,
+  deleteTodo,
+  getTodo,
+  getTodos,
+  updateTodo,
+} from "./controllers/todos.js";
+import bodyParser from "body-parser";
 config();
 // controller
+const parser = bodyParser.json();
 const controller = async (req, res) => {
   try {
     const method = req.method;
     const path = req.url;
 
-    switch (path) {
-      case "/": {
-        if (method === "GET") {
-          res.write("boobalan");
-          return res.end();
-        } else if (method === "POST") {
-          res.write("post request");
-          return res.end();
-        }
-      }
-
-      case "/todos": {
-        if (method === "GET") {
-          const response = [
-            {
-              id: 1,
-              title: "go to restroom",
-              done: true,
-            },
-          ];
-          res.write(response);
-          return res.end();
-        } else if (method === "POST") {
-          const body = req.body;
-          console.log({ body });
-          const response = await createTodo();
-          if (typeof response !== "string") {
-            res.write(JSON.stringify({ response }));
-            res.statusCode = 201;
+    switch (true) {
+      case path.startsWith("/todos"): {
+        const [host, baseUrl, id] = path.split("/");
+        if (id) {
+          if (method === "GET") {
+            const response = await getTodo(id);
+            res.write(JSON.stringify(response));
             return res.end();
+          } else if (method === "DELETE") {
+            const response = await deleteTodo(id);
+            res.write(JSON.stringify(response));
+            return res.end();
+          } else if (method === "PUT") {
+            parser(req, res, async () => {
+              const response = await updateTodo(id, req.body);
+              res.write(JSON.stringify(response));
+              return res.end();
+            });
           }
-          res.write(
-            JSON.stringify({
-              response,
-            })
-          );
-          res.statusCode = 500;
+
+          break;
+        }
+
+        if (method === "GET") {
+          const todos = await getTodos();
+          res.write(JSON.stringify(todos));
           return res.end();
+        } else if (method === "POST") {
+          parser(req, res, async () => {
+            const response = await createTodo(req.body);
+            if (typeof response !== "string") {
+              res.write(JSON.stringify({ response }));
+              res.statusCode = 201;
+              return res.end();
+            }
+            res.write(
+              JSON.stringify({
+                response,
+              })
+            );
+            res.statusCode = 500;
+            return res.end();
+          });
         }
       }
 
